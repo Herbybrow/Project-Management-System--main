@@ -74,6 +74,40 @@ class WorkflowTest extends TestCase
     }
 
     #[Test]
+    public function project_summary_returns_tab_counts_without_loading_tab_collections(): void
+    {
+        $user = $this->actingUser();
+        $project = Project::create(['name' => 'Summary project', 'planner_id' => $user->id]);
+        ImplementationActivity::create([
+            'project_id' => $project->id,
+            'name' => 'Build',
+            'expected_deliverable' => 'Module',
+            'planned_start_date' => '2026-01-01',
+            'planned_end_date' => '2026-01-10',
+            'responsible_person_id' => $user->id,
+        ]);
+        Requirement::create([
+            'project_id' => $project->id,
+            'requirement_code' => 'REQ-SUMMARY',
+            'description' => 'Summary response stays small',
+        ]);
+
+        $this->getJson("/api/projects/{$project->id}?summary=1")
+            ->assertOk()
+            ->assertJsonPath('data.implementation_activities_count', 1)
+            ->assertJsonPath('data.requirements_count', 1)
+            ->assertJsonPath('data.documents_count', 0)
+            ->assertJsonMissingPath('data.implementation_activities')
+            ->assertJsonMissingPath('data.requirements')
+            ->assertJsonMissingPath('data.documents');
+
+        $this->getJson("/api/projects/{$project->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.implementation_activities')
+            ->assertJsonCount(1, 'data.requirements');
+    }
+
+    #[Test]
     public function recommendation_is_blocked_when_gates_fail_and_forwards_by_track(): void
     {
         $user = $this->actingUser();
@@ -81,6 +115,7 @@ class WorkflowTest extends TestCase
 
         $project = Project::create([
             'name' => 'DICT System',
+            'planner_id' => $user->id,
             'category' => 'System',
             'review_track' => 'DICT',
             'plan_review_status' => 'draft',
@@ -124,8 +159,9 @@ class WorkflowTest extends TestCase
     #[Test]
     public function requirement_review_dates_and_remark_history_are_persisted(): void
     {
-        $this->actingUser();
-        $project = Project::create(['name' => 'Matrix Project']);
+        $user = $this->actingUser();
+        $this->grantPermissions($user, ['projects.review']);
+        $project = Project::create(['name' => 'Matrix Project', 'planner_id' => $user->id]);
         $requirement = Requirement::create([
             'project_id' => $project->id,
             'requirement_code' => 'REQ-1',

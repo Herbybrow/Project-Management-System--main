@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ImplementationActivity;
 use App\Models\Project;
+use App\Models\Permission;
 use App\Models\Requirement;
 use App\Models\Role;
 use App\Models\User;
@@ -29,6 +30,16 @@ class PlanLifecycleTest extends TestCase
         $role = Role::firstOrCreate(['name' => 'Project Administrator']);
         $user->roles()->attach($role->id, ['assigned_at' => now(), 'is_active' => true]);
         Sanctum::actingAs($user);
+        return $user;
+    }
+
+    private function authenticateAsReviewer(): User
+    {
+        $user = $this->authenticate();
+        $role = Role::firstOrCreate(['name' => 'Project Reviewer']);
+        $permission = Permission::firstOrCreate(['code' => 'projects.review'], ['name' => 'Review projects']);
+        $role->permissions()->attach($permission->id);
+        $user->roles()->attach($role->id, ['is_active' => true]);
         return $user;
     }
 
@@ -120,7 +131,7 @@ class PlanLifecycleTest extends TestCase
     #[Test]
     public function it_returns_the_matrix_with_a_comment_and_flags_the_plan_as_changes_requested()
     {
-        $this->authenticate();
+        $this->authenticateAsReviewer();
         $project = Project::create(['name' => 'Test Project', 'plan_status' => 'pending_review']);
 
         $response = $this->postJson("/api/projects/{$project->id}/matrix/return", [
@@ -146,7 +157,7 @@ class PlanLifecycleTest extends TestCase
     #[Test]
     public function it_requires_a_comment_to_return_the_matrix()
     {
-        $this->authenticate();
+        $this->authenticateAsReviewer();
         $project = Project::create(['name' => 'Test Project']);
 
         $response = $this->postJson("/api/projects/{$project->id}/matrix/return", []);
@@ -159,7 +170,7 @@ class PlanLifecycleTest extends TestCase
     #[Test]
     public function it_saves_a_review_decision_on_a_requirement()
     {
-        $this->authenticate();
+        $this->authenticateAsReviewer();
         $project = Project::create(['name' => 'Test Project']);
         $requirement = Requirement::create([
             'project_id' => $project->id,
@@ -188,7 +199,7 @@ class PlanLifecycleTest extends TestCase
     #[Test]
     public function it_rejects_an_invalid_review_decision()
     {
-        $this->authenticate();
+        $this->authenticateAsReviewer();
         $project = Project::create(['name' => 'Test Project']);
         $requirement = Requirement::create([
             'project_id' => $project->id,

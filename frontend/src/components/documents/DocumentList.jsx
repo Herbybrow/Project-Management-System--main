@@ -8,8 +8,9 @@ import ReviewStatusBadge from '../common/ReviewStatusBadge'
 import DocumentUploadModal from './DocumentUploadModal'
 import ProjectPicker from '../common/ProjectPicker'
 import { isSpecReadOnlyRole, useActiveRoleName } from '../common/RoleGuard'
-import api from '../../lib/axios'
 import { fetchProjectsCached } from '../../lib/projectsCache'
+import { fetchCached } from '../../lib/cachedApi'
+import { useRequestCacheRevision } from '../../lib/useRequestCacheRevision'
 import {
   fetchAuthorizedFileUrl,
   getStoredProjectId,
@@ -30,6 +31,7 @@ function DocumentList({
   projectId: projectIdProp = null,
   compact = false,
   detailStyle = false,
+  active = true,
 } = {}) {
   const { id: routeId } = useParams()
   const readOnly = isSpecReadOnlyRole(useActiveRoleName())
@@ -49,6 +51,7 @@ function DocumentList({
   const [documents, setDocuments] = useState([])
   const [uploadOpen, setUploadOpen] = useState(false)
   const [viewTarget, setViewTarget] = useState(null)
+  const revision = useRequestCacheRevision()
 
   const loadProjects = useCallback(async () => {
     const fromRoute = Number(routeId)
@@ -86,17 +89,17 @@ function DocumentList({
       setDocuments([])
       return
     }
-    const response = await api.get(`/projects/${id}/documents`)
+    const response = await fetchCached(`/projects/${id}/documents`)
     setDocuments(unwrapList(response.data))
   }, [])
 
   useEffect(() => {
-    loadProjects().catch((err) => message.error(err.response?.data?.message || 'Could not load projects'))
-  }, [loadProjects])
+    if (active) loadProjects().catch((err) => message.error(err.response?.data?.message || 'Could not load projects'))
+  }, [active, loadProjects])
 
   useEffect(() => {
-    loadDocuments(projectId).catch((err) => message.error(err.response?.data?.message || 'Could not load documents'))
-  }, [projectId, loadDocuments])
+    if (active) loadDocuments(projectId).catch((err) => message.error(err.response?.data?.message || 'Could not load documents'))
+  }, [active, projectId, loadDocuments, revision])
 
   const downloadFile = async (doc) => {
     try {

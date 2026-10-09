@@ -9,3 +9,9 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# The SPA is packaged separately from frontend/dist. Excluding its source from
+# a committed backend release archive avoids transferring development-only UI
+# files to the Laravel/PHP-FPM host.
+frontend export-ignore
+frontend/** export-ignore

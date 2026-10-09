@@ -12,13 +12,14 @@ function ActivityDocumentsModal({ open, activity, projectId, onCancel }) {
   const [documents, setDocuments] = useState([])
   const [uploadOpen, setUploadOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const activityId = activity?.id
 
   const load = useCallback(async () => {
-    if (!open || !projectId || !activity?.id) return
+    if (!open || !projectId || !activityId) return
     setLoading(true)
     try {
       const response = await api.get(`/projects/${projectId}/documents`, {
-        params: { activity_id: activity.id },
+        params: { activity_id: activityId },
       })
       setDocuments(unwrapList(response.data))
     } catch (err) {
@@ -26,7 +27,7 @@ function ActivityDocumentsModal({ open, activity, projectId, onCancel }) {
     } finally {
       setLoading(false)
     }
-  }, [open, projectId, activity?.id])
+  }, [open, projectId, activityId])
 
   useEffect(() => {
     load()

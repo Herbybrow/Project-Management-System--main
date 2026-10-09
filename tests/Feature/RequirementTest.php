@@ -24,7 +24,7 @@ class RequirementTest extends TestCase
     public function it_can_successfully_update_requirement_status_and_remarks()
     {
         $project = Project::create([
-            'name' => 'Test Project'
+            'name' => 'Test Project', 'planner_id' => auth()->id()
         ]);
 
         $requirement = Requirement::create([
@@ -69,7 +69,7 @@ class RequirementTest extends TestCase
     public function it_fails_validation_when_invalid_status_is_provided()
     {
         $project = Project::create([
-            'name' => 'Test Project'
+            'name' => 'Test Project', 'planner_id' => auth()->id()
         ]);
 
         $requirement = Requirement::create([
@@ -89,7 +89,7 @@ class RequirementTest extends TestCase
     #[Test]
     public function it_can_fetch_project_progress_and_metrics()
     {
-        $project = Project::create(['name' => 'Test Project']);
+        $project = Project::create(['name' => 'Test Project', 'planner_id' => auth()->id()]);
 
         Requirement::create([
             'project_id' => $project->id,

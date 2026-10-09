@@ -21,16 +21,17 @@ import { CloseCircleOutlined, DownloadOutlined, PlusOutlined } from '@ant-design
 import { Search } from 'lucide-react'
 import api from '../lib/axios'
 import { fetchProjectsCached } from '../lib/projectsCache'
+import { fetchCached } from '../lib/cachedApi'
 import { fetchAuthorizedFileUrl, storeProjectId, unwrapItem, unwrapList } from '../lib/apiHelpers'
 import { useAuth } from '../context/AuthContext'
 import { ROLES } from '../utility/Config.jsx'
 import { deriveStatus } from '../lib/status'
 import { formatDate } from '../lib/dates'
 import InitiationDocumentsPanel from '../components/projects/InitiationDocumentsPanel'
-import ProjectDetailsView from '../components/projects/ProjectDetailsView'
 import { MODAL_WIDTH } from '../lib/modalSizes'
 
 const ProjectRegistration = lazy(() => import('./ProjectRegistration'))
+const ProjectDetailsView = lazy(() => import('../components/projects/ProjectDetailsView'))
 
 const DERIVED_STATUS_LABELS = { not_started: 'Not started', ongoing: 'Ongoing', completed: 'Completed' }
 const LIFECYCLE_STAGE_LABELS = { initiation: 'Initiation', planning: 'Planning', execution: 'Execution', closure: 'Closure' }
@@ -106,7 +107,7 @@ function ProjectsPage({ mode = 'browse' } = {}) {
   const [previewDoc, setPreviewDoc] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const [actionsOpenId, setActionsOpenId] = useState(null)
+  const [, setActionsOpenId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [registerLoaded, setRegisterLoaded] = useState(false)
@@ -162,7 +163,7 @@ function ProjectsPage({ mode = 'browse' } = {}) {
   const loadUsersForReassign = useCallback(async () => {
     if (users.length) return
     try {
-      const usersRes = await api.get('/users')
+      const usersRes = await fetchCached('/users')
       setUsers(unwrapList(usersRes.data))
     } catch {
       message.error('Could not load planners.')
@@ -170,9 +171,11 @@ function ProjectsPage({ mode = 'browse' } = {}) {
   }, [users.length])
 
   const loadDetailWorkflow = (projectId) => {
-    api
-      .get(`/projects/${projectId}/workflow`)
-      .then((response) => setDetailWorkflow(unwrapItem(response.data)))
+    fetchCached(`/projects/${projectId}`, { params: { summary: 1 } })
+      .then((response) => {
+        setDetailWorkflow(response.data?.workflow ?? null)
+        setDetailTarget((previous) => previous?.id === projectId ? { ...previous, ...unwrapItem(response.data) } : previous)
+      })
       .catch(() => setDetailWorkflow(null))
   }
 
@@ -183,9 +186,6 @@ function ProjectsPage({ mode = 'browse' } = {}) {
     storeProjectId(record.id)
     loadDetailWorkflow(record.id)
 
-    if (isPlannerRole) {
-      loadUsersForReassign()
-    }
   }
 
   useEffect(() => {
@@ -252,13 +252,6 @@ function ProjectsPage({ mode = 'browse' } = {}) {
   const handleWorkspaceChanged = () => {
     if (!detailTarget) return
     loadDetailWorkflow(detailTarget.id)
-    api
-      .get(`/projects/${detailTarget.id}`)
-      .then((response) => {
-        const updated = unwrapItem(response.data)
-        setDetailTarget((prev) => (prev ? { ...prev, ...updated } : updated))
-      })
-      .catch(() => {})
     load()
   }
 
@@ -760,7 +753,8 @@ function ProjectsPage({ mode = 'browse' } = {}) {
         }
       >
         {detailTarget && (
-          <ProjectDetailsView
+          <Suspense fallback={<Spin size="large" />}><ProjectDetailsView
+            key={detailTarget.id}
             project={detailTarget}
             onProjectChanged={handleWorkspaceChanged}
             readOnlyBrowse={isBrowseMode}
@@ -810,7 +804,7 @@ function ProjectsPage({ mode = 'browse' } = {}) {
                 />
               ) : null
             }
-          />
+          /></Suspense>
         )}
       </Modal>
 

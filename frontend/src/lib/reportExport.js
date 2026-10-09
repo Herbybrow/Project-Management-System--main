@@ -103,7 +103,7 @@ export async function exportReport({ element, filename, openInNewTab = false, do
   }
 }
 
-export async function exportExcel({ sheets, filename, openInNewTab = false }) {
+export async function exportExcel({ sheets, filename }) {
   const { default: ExcelJS } = await import('exceljs')
   const workbook = new ExcelJS.Workbook()
   sheets.forEach(({ name, columns, rows }) => {

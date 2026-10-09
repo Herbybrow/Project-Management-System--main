@@ -37,7 +37,6 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function toAuthArray(): array
     {
-        $this->reactivateAssignedRolesIfNeeded();
         $this->unsetRelation('activeRoles');
         $this->load('activeRoles');
 
@@ -57,16 +56,6 @@ class User extends Authenticatable implements MustVerifyEmail
             'roles' => $roles,
             'permissions' => $this->permissionCodes(),
         ];
-    }
-
-    /**
-     * Older sync() calls stored is_active=0, which hid every role from the UI.
-     */
-    public function reactivateAssignedRolesIfNeeded(): void
-    {
-        if ($this->roles()->exists() && ! $this->activeRoles()->exists()) {
-            $this->roles()->newPivotQuery()->update(['is_active' => true]);
-        }
     }
 
     /**

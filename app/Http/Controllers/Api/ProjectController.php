@@ -198,6 +198,11 @@ class ProjectController extends Controller
         if (array_key_exists('budget', $attributes) && $attributes['budget'] !== null) {
             $attributes['budget'] = (float) $attributes['budget'];
         }
+        // PostgreSQL returns NUMERIC as strings; keep the list API's
+        // existing numeric score contract across database drivers.
+        if (array_key_exists('overall_implementation_score', $attributes) && $attributes['overall_implementation_score'] !== null) {
+            $attributes['overall_implementation_score'] = $attributes['overall_implementation_score'] + 0;
+        }
         if (array_key_exists('plan_pending_reapproval', $attributes)) {
             $attributes['plan_pending_reapproval'] = (bool) $attributes['plan_pending_reapproval'];
         }
@@ -271,7 +276,7 @@ class ProjectController extends Controller
         return str_replace(' ', 'T', $raw).'.000000Z';
     }
 
-    public function show(Project $project): JsonResponse
+    public function show(Request $request, Project $project): JsonResponse
     {
         $project->load([
             'reviewer:id,name,email',
@@ -279,10 +284,13 @@ class ProjectController extends Controller
             'coordinator:id,name,email',
             'approver:id,name,email',
             'forwardedTo:id,name,email',
-            'implementationActivities',
-            'documents',
-            'requirements',
         ]);
+
+        if ($request->boolean('summary')) {
+            $project->loadCount(['implementationActivities', 'documents', 'requirements']);
+        } else {
+            $project->load(['implementationActivities', 'documents', 'requirements']);
+        }
 
         return response()->json([
             'data' => $project,
@@ -329,6 +337,8 @@ class ProjectController extends Controller
         if (! $this->allows($request, ['projects.assign_planner', 'projects.reassign_planner'])) {
             return response()->json(['message' => 'Unauthorized access.'], 403);
         }
+
+        $this->guardOpen($project);
 
         $validated = $request->validate([
             'planner_id' => ['required', 'exists:users,id'],

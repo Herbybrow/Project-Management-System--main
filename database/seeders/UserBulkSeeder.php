@@ -8,22 +8,33 @@ use App\Models\User;
 use App\Models\UserActivityLog;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Volume for the ICT Support dashboard: users spread across every role
  * (plus a handful with none, and a handful disabled), and account-activity
- * history for the "Recent account activity" table. ~45 users total once
- * combined with UserSeeder's 8 named accounts.
+ * history for the "Recent account activity" table. Development data only.
  */
 class UserBulkSeeder extends Seeder
 {
     public function run(): void
     {
-        if (User::where('email', 'bulk1@nssf.or.tz')->exists()) {
-            return;
+        DemoDataGuard::check();
+        DB::transaction(fn () => $this->seedUsers());
+    }
+
+    private function seedUsers(): void
+    {
+        $emails = array_map(fn ($n) => 'bulk'.$n.'@nssf.or.tz', range(1, 43));
+        $existing = User::whereIn('email', $emails)->count();
+        if ($existing > 0) {
+            if ($existing === 43) {
+                return;
+            }
+            throw new \RuntimeException('Incomplete bulk demo account set. No data was changed; use a new disposable database.');
         }
 
-        $ictSupport = User::where('email', 'ictsupport@nssf.go.tz')->first();
+        $ictSupport = DemoUsers::resolve('ICT Support', 'ictsupport@gmail.com');
 
         $roleAllocation = [
             'Project Planner' => 14,
@@ -38,7 +49,7 @@ class UserBulkSeeder extends Seeder
         $created = 0;
 
         foreach ($roleAllocation as $roleName => $count) {
-            $role = Role::where('name', $roleName)->first();
+            $role = Role::where('name', $roleName)->firstOrFail();
 
             for ($n = 1; $n <= $count; $n++) {
                 $created++;

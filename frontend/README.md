@@ -1,3 +1,11 @@
+## NSSF frontend
+
+This directory contains the standalone React application. Install with `npm ci`, then run `npm run dev` for local development. Copy `.env.example` to `.env` only if it does not already exist; the local API defaults to `http://localhost:8000/api`.
+
+Production API configuration uses `VITE_API_BASE_URL`, embedded by Vite during `npm run build`. Set it to the approved backend origin plus `/api`, or create `.env.production` from `.env.production.example`. The legacy `VITE_API_URL` name remains supported. Never put secrets in VITE variables.
+
+Build `dist` on the laptop and deploy its contents as static files; no Node server is required in production. Use the root repository's [deployment guide](../docs/DEPLOYMENT_GUIDE.md) for Windows CMD syntax, CORS, Nginx, SPA fallback and backend port 8001. Read [audit results](../docs/AUDIT_RESULTS.md) for the current lint warnings and build warnings.
+
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

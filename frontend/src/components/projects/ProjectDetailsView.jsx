@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { Spin } from 'antd'
 import { FileText, Activity, ListChecks } from 'lucide-react'
-import api from '../../lib/axios'
-import { storeProjectId, unwrapList } from '../../lib/apiHelpers'
+import { storeProjectId } from '../../lib/apiHelpers'
 import { formatDate } from '../../lib/dates'
-import DocumentList from '../documents/DocumentList'
-import ImplementationPlanPage from '../../pages/ImplementationPlanPage'
 import './ProjectDetailsView.css'
+
+const DocumentList = lazy(() => import('../documents/DocumentList'))
+const ImplementationPlanPage = lazy(() => import('../../pages/ImplementationPlanPage'))
 
 const TABS = [
   { key: 'activity', label: 'Activity', Icon: Activity },
@@ -39,7 +40,12 @@ export default function ProjectDetailsView({
 }) {
   const projectId = project?.id
   const [activeTab, setActiveTab] = useState('activity')
-  const [counts, setCounts] = useState({ documents: 0, activity: 0, requirements: 0 })
+  const [visitedTabs, setVisitedTabs] = useState(['activity'])
+  const counts = {
+    documents: project?.documents_count,
+    activity: project?.implementation_activities_count,
+    requirements: project?.requirements_count,
+  }
   const [sectionActions, setSectionActions] = useState(null)
 
   const handleRegisterActions = useCallback((actions) => {
@@ -48,8 +54,6 @@ export default function ProjectDetailsView({
 
   useEffect(() => {
     if (projectId) storeProjectId(projectId)
-    setActiveTab('activity')
-    setSectionActions(null)
   }, [projectId])
 
   useEffect(() => {
@@ -77,27 +81,10 @@ export default function ProjectDetailsView({
     return () => onFooterActionChange(null)
   }, [activeTab, sectionActions, readOnlyBrowse, initiationPanel, onFooterActionChange])
 
-  useEffect(() => {
-    if (!projectId) return undefined
-    let cancelled = false
-
-    Promise.all([
-      api.get(`/projects/${projectId}/documents`).catch(() => ({ data: [] })),
-      api.get(`/projects/${projectId}/activities`).catch(() => ({ data: [] })),
-      api.get(`/projects/${projectId}/requirements`).catch(() => ({ data: [] })),
-    ]).then(([docsRes, actsRes, reqsRes]) => {
-      if (cancelled) return
-      setCounts({
-        documents: unwrapList(docsRes.data).length,
-        activity: unwrapList(actsRes.data).length,
-        requirements: unwrapList(reqsRes.data).length,
-      })
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [projectId])
+  const selectTab = (key) => {
+    setActiveTab(key)
+    setVisitedTabs((previous) => previous.includes(key) ? previous : [...previous, key])
+  }
 
   if (!project) return null
 
@@ -168,22 +155,28 @@ export default function ProjectDetailsView({
                   key={key}
                   type="button"
                   className={`pms-detail__tab${active ? ' is-active' : ''}`}
-                  onClick={() => setActiveTab(key)}
+                  onClick={() => selectTab(key)}
                 >
                   <Icon size={16} strokeWidth={2} aria-hidden="true" />
                   <span>{label}</span>
-                  <span className="pms-detail__tab-count">{counts[key] ?? 0}</span>
+                  <span className="pms-detail__tab-count">{counts[key] ?? '…'}</span>
                 </button>
               )
             })}
           </nav>
 
           <div className="pms-detail__panel">
-            {activeTab === 'documents' && (
-              <DocumentList embedded projectId={projectId} compact detailStyle />
+            {visitedTabs.includes('documents') && (
+              <div hidden={activeTab !== 'documents'}>
+                <Suspense fallback={<Spin size="small" />}>
+                  <DocumentList embedded projectId={projectId} compact detailStyle active={activeTab === 'documents'} />
+                </Suspense>
+              </div>
             )}
-            {activeTab === 'activity' && (
+            {visitedTabs.includes('activity') && (
+              <div hidden={activeTab !== 'activity'}><Suspense fallback={<Spin size="small" />}>
               <ImplementationPlanPage
+                active={activeTab === 'activity'}
                 embedded
                 projectId={projectId}
                 onActivityReview={readOnlyBrowse ? null : onActivityReview}
@@ -198,9 +191,12 @@ export default function ProjectDetailsView({
                 readOnlyBrowse={readOnlyBrowse}
                 workspaceSection="activities"
               />
+              </Suspense></div>
             )}
-            {activeTab === 'requirements' && (
+            {visitedTabs.includes('requirements') && (
+              <div hidden={activeTab !== 'requirements'}><Suspense fallback={<Spin size="small" />}>
               <ImplementationPlanPage
+                active={activeTab === 'requirements'}
                 embedded
                 projectId={projectId}
                 onProjectChanged={onProjectChanged}
@@ -213,6 +209,7 @@ export default function ProjectDetailsView({
                 readOnlyBrowse={readOnlyBrowse}
                 workspaceSection="requirements"
               />
+              </Suspense></div>
             )}
           </div>
         </>

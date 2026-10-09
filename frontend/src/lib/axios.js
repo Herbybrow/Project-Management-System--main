@@ -1,6 +1,6 @@
 import axios from 'axios';
-
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
+import { apiBaseUrl } from './apiConfig';
+import { requestCache } from './requestCache';
 
 const api = axios.create({
   baseURL: apiBaseUrl,
@@ -38,9 +38,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     const method = response.config?.method?.toLowerCase();
-    const url = response.config?.url || '';
-    if (method && method !== 'get' && url.includes('/projects')) {
-      import('./projectsCache').then(({ invalidateProjectsCache }) => invalidateProjectsCache());
+    if (method && !['get', 'head', 'options'].includes(method)) {
+      requestCache.invalidate();
     }
     return response;
   },
@@ -48,6 +47,7 @@ api.interceptors.response.use(
     const isLoginRequest = error.config?.url?.includes('/login');
     const onLoginPage = window.location.pathname === '/login';
     if (error.response?.status === 401 && !isLoginRequest && !onLoginPage) {
+      requestCache.invalidate();
       localStorage.clear();
       window.location.assign('/login');
     }

@@ -22,4 +22,32 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-frontend/package-lock.json
+/tmp/
+
+# Local AI assistant workspaces and instructions. These are not application
+# source or collaboration artifacts for this repository.
+/.continue/
+/.cursor/
+/.claude/
+/.codex/
+/.aider*/
+/AGENTS.md
+/CLAUDE.md
+/GEMINI.md
+/COPILOT.md
+
+# Accidental local command capture; not part of the project.
+/tus --short --untracked-files=normal
+/repomix-output.xml
+
+# Credentials, certificates, and database/archive artifacts are local-only.
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.dump
+*.sql.gz
+*.bak
+*.tgz

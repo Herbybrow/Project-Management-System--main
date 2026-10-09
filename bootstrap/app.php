@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'manage.users' => \App\Http\Middleware\EnsureCanManageUsers::class,
             'can.mutate' => \App\Http\Middleware\EnsureCanMutate::class,
             'log.denied' => \App\Http\Middleware\LogFailedAuthorization::class,
+            'account.active' => \App\Http\Middleware\EnsureActiveAccount::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

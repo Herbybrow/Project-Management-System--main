@@ -19,6 +19,9 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $role = $request->query('role') ?: data_get($user->toAuthArray(), 'role');
+        if ($role && ! $user->hasRole($role)) {
+            return response()->json(['message' => 'This dashboard role is not assigned to your account.'], 403);
+        }
 
         $pendingActions = [];
         $metrics = ProjectDashboardMetrics::getReviewerMetrics();

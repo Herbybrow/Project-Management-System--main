@@ -5,16 +5,9 @@ namespace Database\Seeders;
 use App\Models\Role;
 use App\Models\Permission;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class RoleSeeder extends Seeder
 {
-    /** Roles retired from the product — removed on every seed so stale DB rows cannot reappear in User Management. */
-    private const OBSOLETE_ROLES = [
-        'Project Implementor',
-        'Project Implementer',
-    ];
-
     public function run(): void
     {
         $roles = [
@@ -38,19 +31,6 @@ class RoleSeeder extends Seeder
             );
             $permIds = Permission::whereIn('code', $permCodes)->pluck('id');
             $role->permissions()->sync($permIds);
-        }
-
-        $this->removeObsoleteRoles();
-    }
-
-    private function removeObsoleteRoles(): void
-    {
-        $obsolete = Role::whereIn('name', self::OBSOLETE_ROLES)->get();
-
-        foreach ($obsolete as $role) {
-            DB::table('user_roles')->where('role_id', $role->id)->delete();
-            $role->permissions()->detach();
-            $role->delete();
         }
     }
 }

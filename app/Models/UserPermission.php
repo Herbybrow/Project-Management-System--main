@@ -12,6 +12,8 @@ class UserPermission extends Model
 
     protected $fillable = ['user_id', 'permission_id', 'is_granted'];
 
+    protected $casts = ['is_granted' => 'boolean'];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

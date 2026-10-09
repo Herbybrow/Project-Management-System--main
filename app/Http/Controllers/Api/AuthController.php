@@ -58,13 +58,16 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $fieldType = filter_var($request->login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        // The schema and login form use email; there is no username column.
+        // Resolve the stored email case-insensitively on PostgreSQL as well.
+        $attemptedUser = filter_var($request->login, FILTER_VALIDATE_EMAIL)
+            ? User::whereRaw('LOWER(email) = ?', [strtolower($request->login)])->first()
+            : null;
 
-        if (! Auth::attempt([$fieldType => $request->login, 'password' => $request->password])) {
+        if (! $attemptedUser || ! Auth::attempt(['email' => $attemptedUser->email, 'password' => $request->password])) {
             // Only logged when the identifier matches a real account — that's
             // the actionable "someone is guessing this account's password"
             // signal; a typo'd/unknown login isn't worth a row.
-            $attemptedUser = User::where($fieldType, $request->login)->first();
             if ($attemptedUser) {
                 $this->recordAudit($attemptedUser->id, 'login_failed', $request);
             }
@@ -85,8 +88,6 @@ class AuthController extends Controller
             ]);
         }
 
-        $this->ensureKnownAccountHasRole($user);
-        $user->refresh();
         $token = $user->createToken('auth_token')->plainTextToken;
         $this->recordAudit($user->id, 'login_success', $request);
 
@@ -105,9 +106,11 @@ class AuthController extends Controller
         /** @var PersonalAccessToken|null $token */
         $token = $user?->currentAccessToken();
 
-        if ($token) {
+        if ($token instanceof PersonalAccessToken) {
             $token->delete();
         }
+
+        Auth::guard('web')->logout();
 
         if ($user) {
             $this->recordAudit($user->id, 'logout', $request);
@@ -119,14 +122,13 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
-        $this->ensureKnownAccountHasRole($user);
-        $user->refresh();
+        $auth = $user->toAuthArray();
 
         return response()->json([
-            'data'           => $user->toAuthArray(),
-            'user'           => $user->toAuthArray(),
+            'data'           => $auth,
+            'user'           => $auth,
             'email_verified' => $user->hasVerifiedEmail(),
-            'permissions'    => $user->permissionCodes(),
+            'permissions'    => $auth['permissions'],
         ], 200);
     }
 
@@ -182,38 +184,6 @@ class AuthController extends Controller
         $user->sendEmailVerificationNotification();
 
         return response()->json(['message' => 'Verification email link resent successfully.'], 200);
-    }
-
-    private function ensureKnownAccountHasRole(User $user): void
-    {
-        if ($user->roles()->exists()) {
-            return;
-        }
-
-        $roleByEmail = [
-            'mussasaid@gmail.com' => 'Project Administrator',
-            'sms.mussasaid@gmail.com' => 'Project Administrator',
-            'luquman2004tajir@gmail.com' => 'Project Reviewer',
-            'ictsupport@nssf.go.tz' => 'ICT Support',
-            'coordinator@nssf.or.tz' => 'Project Coordinator',
-            'approver@nssf.or.tz' => 'Project Approver',
-            'planner@nssf.or.tz' => 'Project Planner',
-            'viewonly@nssf.or.tz' => 'Project ViewOnly',
-        ];
-
-        $roleName = $roleByEmail[strtolower((string) $user->email)] ?? null;
-        if (! $roleName) {
-            return;
-        }
-
-        $role = \App\Models\Role::where('name', $roleName)->first();
-        if (! $role) {
-            return;
-        }
-
-        $user->roles()->sync([
-            $role->id => ['is_active' => true, 'assigned_at' => now()],
-        ]);
     }
 
     private function recordAudit(int $userId, string $action, Request $request, ?string $description = null): void

@@ -1,18 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Col, Row, Statistic } from 'antd'
+import { Card, Col, Row, Spin, Statistic } from 'antd'
 import api from '../lib/axios'
 import { unwrapItem } from '../lib/apiHelpers'
 import { useAuth } from '../context/AuthContext'
 import { ROLES } from '../utility/Config.jsx'
-import AdministratorDashboard from '../components/dashboard/AdministratorDashboard'
-import ReviewerDashboard from '../components/dashboard/ReviewerDashboard'
-import ViewOnlyDashboard from '../components/dashboard/ViewOnlyDashboard'
-import IctSupportDashboard from '../components/dashboard/IctSupportDashboard'
-import PlannerDashboard from '../components/dashboard/PlannerDashboard'
-import CoordinatorDashboard from '../components/dashboard/CoordinatorDashboard'
-import ApproverDashboard from '../components/dashboard/ApproverDashboard'
 import { DASHBOARD_CARD_STYLE } from '../components/dashboard/shared/chartConstants'
+
+const ROLE_DASHBOARDS = {
+  [ROLES.PAD]: lazy(() => import('../components/dashboard/AdministratorDashboard')),
+  [ROLES.PRV]: lazy(() => import('../components/dashboard/ReviewerDashboard')),
+  [ROLES.PVO]: lazy(() => import('../components/dashboard/ViewOnlyDashboard')),
+  [ROLES.IS]: lazy(() => import('../components/dashboard/IctSupportDashboard')),
+  [ROLES.PPL]: lazy(() => import('../components/dashboard/PlannerDashboard')),
+  [ROLES.PCO]: lazy(() => import('../components/dashboard/CoordinatorDashboard')),
+  [ROLES.PAP]: lazy(() => import('../components/dashboard/ApproverDashboard')),
+}
 
 const METRIC_LABELS = {
   new_registrations: 'New registrations',
@@ -70,32 +73,9 @@ function DashboardPage() {
       .map(([key, label]) => ({ key, label, value: counts[key] }))
   }, [payload])
 
-  if (isAdministrator) {
-    return <AdministratorDashboard />
-  }
-
-  if (isReviewer) {
-    return <ReviewerDashboard />
-  }
-
-  if (isPlanner) {
-    return <PlannerDashboard />
-  }
-
-  if (isCoordinator) {
-    return <CoordinatorDashboard />
-  }
-
-  if (isApprover) {
-    return <ApproverDashboard />
-  }
-
-  if (isViewOnly) {
-    return <ViewOnlyDashboard />
-  }
-
-  if (isIctSupport) {
-    return <IctSupportDashboard />
+  const RoleDashboard = ROLE_DASHBOARDS[activeRole?.name]
+  if (RoleDashboard) {
+    return <Suspense fallback={<Spin size="large" />}><RoleDashboard /></Suspense>
   }
 
   return (

@@ -46,7 +46,9 @@ class RequirementController extends Controller
             'remarks' => 'nullable|string',
         ]);
 
-        ProjectWorkflowService::assertProjectOpen(Project::findOrFail($validated['project_id']));
+        $project = Project::findOrFail($validated['project_id']);
+        ProjectWorkflowService::assertProjectOpen($project);
+        abort_unless($project->canBeManagedBy($request->user()), 403);
 
         $validated['implementation_status'] = 'Pending';
 
@@ -67,6 +69,7 @@ class RequirementController extends Controller
     {
         $requirement = Requirement::with('project')->findOrFail($id);
         ProjectWorkflowService::assertProjectOpen($requirement->project);
+        abort_unless($requirement->project->canBeManagedBy($request->user()), 403);
 
         $validated = $request->validate([
             'requirement_code' => 'required|string',
@@ -122,6 +125,7 @@ class RequirementController extends Controller
     {
         $requirement = Requirement::with('project')->findOrFail($id);
         ProjectWorkflowService::assertProjectOpen($requirement->project);
+        abort_unless($requirement->project->canBeManagedBy($request->user()), 403);
         $dateRules = ProgressDateRules::actual(
             optional($requirement->project?->planned_start_date)->toDateString(),
             null,
@@ -170,6 +174,7 @@ class RequirementController extends Controller
     {
         $requirement = Requirement::with('project')->findOrFail($id);
         ProjectWorkflowService::assertProjectOpen($requirement->project);
+        abort_unless($request->user()->hasPermission('projects.review'), 403);
         $dateRules = ProgressDateRules::actual(
             optional($requirement->project?->planned_start_date)->toDateString(),
             null,
@@ -241,6 +246,7 @@ class RequirementController extends Controller
     {
         $project = Project::findOrFail($projectId);
         ProjectWorkflowService::assertProjectOpen($project);
+        abort_unless($request->user()->hasPermission('projects.review'), 403);
         $validated = $request->validate([
             'comment' => ['required', 'string'],
         ]);

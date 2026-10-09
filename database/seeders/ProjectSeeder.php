@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\ProjectCatalog;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Sample data for the Administrator dashboard at "/". Covers every axis it
@@ -22,14 +23,39 @@ class ProjectSeeder extends Seeder
 {
     public function run(): void
     {
-        if (Project::where('annual_plan_reference', 'NSSF-2026-APR-101')->exists()) {
-            return;
+        DemoDataGuard::check();
+        DB::transaction(fn () => $this->seedProjects());
+    }
+
+    private function seedProjects(): void
+    {
+        $references = array_map(
+            fn ($number) => 'NSSF-2026-APR-'.$number,
+            array_merge(range(101, 110), range(201, 238))
+        );
+        $existing = Project::whereIn('annual_plan_reference', $references)->pluck('annual_plan_reference');
+        if ($existing->isNotEmpty()) {
+            if ($existing->count() === 48 && $existing->unique()->count() === 48) {
+                $invalid = Project::whereIn('annual_plan_reference', $references)
+                    ->where(function ($query) {
+                        $query->whereDoesntHave('reviewer.activeRoles', fn ($role) => $role->where('roles.name', 'Project Reviewer'))
+                            ->orWhereDoesntHave('planner.activeRoles', fn ($role) => $role->where('roles.name', 'Project Planner'));
+                    })->exists();
+                if ($invalid) {
+                    throw new \RuntimeException('Existing demo projects have missing or incorrect reviewer/planner roles. Review their assignments manually; no project was changed.');
+                }
+                return;
+            }
+
+            throw new \RuntimeException(
+                'Incomplete or duplicate demo project set detected. No data was changed. Use a new disposable database for DemoSeeder; review existing projects manually.'
+            );
         }
 
-        $reviewer = User::where('email', 'luquman2004tajir@gmail.com')->first();
-        $planner = User::where('email', 'planner@nssf.or.tz')->first();
-        $coordinator = User::where('email', 'coordinator@nssf.or.tz')->first();
-        $approver = User::where('email', 'approver@nssf.or.tz')->first();
+        $reviewer = DemoUsers::resolve('Project Reviewer', 'reviewer@example.test');
+        $planner = DemoUsers::resolve('Project Planner', 'planner@example.test');
+        $coordinator = DemoUsers::resolve('Project Coordinator', 'coordinator@example.test');
+        $approver = DemoUsers::resolve('Project Approver', 'approver@example.test');
 
         // 1) Execution, ongoing, overdue activity at 1 day, a pending document.
         $p1 = $this->makeProject([
@@ -440,6 +466,12 @@ class ProjectSeeder extends Seeder
         ?string $phase = null,
     ): Document {
         $uploader = $project->planner_id ?? $project->reviewer_id;
+
+        if ($uploader === null) {
+            throw new \RuntimeException(
+                'Cannot seed document for project '.$project->id.': no uploader user is assigned.'
+            );
+        }
 
         return Document::create([
             'project_id' => $project->id,

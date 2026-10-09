@@ -171,15 +171,14 @@ class ProjectWorkflowService
 
     public static function executionBlockers(Project $project): array
     {
-        $project->loadMissing(['implementationActivities.documents', 'documents', 'requirements']);
-
         $blockers = [];
 
         if ($project->plan_review_status !== 'approved') {
             $blockers[] = 'Implementation plan has not been reviewed and approved.';
         }
 
-        $currentDocs = $project->documents->where('is_current', true);
+        $currentDocs = $project->documents()->where('is_current', true)
+            ->get(['document_type', 'review_status']);
 
         foreach (self::REQUIRED_DOCUMENT_TYPES as $type) {
             $hasType = $currentDocs->contains(function ($document) use ($type) {
@@ -195,9 +194,9 @@ class ProjectWorkflowService
             $blockers[] = 'Returned documents still have unresolved reviewer comments.';
         }
 
-        $activitiesWithoutDocs = $project->implementationActivities->filter(function ($activity) {
-            return $activity->documents->where('is_current', true)->isEmpty();
-        });
+        $activitiesWithoutDocs = $project->implementationActivities()
+            ->whereDoesntHave('documents', fn ($query) => $query->where('is_current', true))
+            ->orderBy('id')->limit(5)->get(['name']);
         if ($activitiesWithoutDocs->isNotEmpty()) {
             $names = $activitiesWithoutDocs->pluck('name')->take(5)->implode(', ');
             $blockers[] = "Activities missing documents: {$names}.";
@@ -347,6 +346,9 @@ class ProjectWorkflowService
         $inExecution = (bool) $project->execution_started_at;
         $closed = (bool) $project->closed_at;
 
+        $closureChecks = $project->closureChecks();
+        $readyToClose = collect($closureChecks)->every(fn ($check) => $check['passed']);
+
         return [
             'plan_review_status' => $project->plan_review_status,
             'plan_review_comment' => $project->plan_review_comment,
@@ -373,12 +375,12 @@ class ProjectWorkflowService
             'closure_requested_at' => $project->closure_requested_at,
             'closure_request_comment' => $project->closure_request_comment,
             'closure_return_comment' => $project->closure_return_comment,
-            'can_request_closure' => $project->isReadyToClose() && ! $project->closure_requested_at && ! $closed,
-            'can_approve_closure' => $project->isReadyToClose() && (bool) $project->closure_requested_at && ! $closed,
+            'can_request_closure' => $readyToClose && ! $project->closure_requested_at && ! $closed,
+            'can_approve_closure' => $readyToClose && (bool) $project->closure_requested_at && ! $closed,
             'matrix_return_comment' => $project->matrix_return_comment,
             'matrix_returned_at' => $project->matrix_returned_at,
             'can_submit_plan' => $project->canSubmitPlan()
-                && $project->implementationActivities()->count() > 0
+                && $project->implementationActivities()->exists()
                 && ! $closed,
             'can_review_plan' => $project->plan_review_status === 'pending_review' && ! $closed,
             'can_recommend' => $project->plan_review_status === 'approved' && $track !== 'DICT' && ! $inExecution && ! $closed,
@@ -388,8 +390,8 @@ class ProjectWorkflowService
             'execution_blockers' => $blockers,
             'required_document_types' => self::REQUIRED_DOCUMENT_TYPES,
             'closure' => [
-                'ready' => $project->isReadyToClose(),
-                'checks' => $project->closureChecks(),
+                'ready' => $readyToClose,
+                'checks' => $closureChecks,
             ],
         ];
     }

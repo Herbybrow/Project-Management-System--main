@@ -11,6 +11,7 @@ use App\Services\ProjectWorkflowService;
 use App\Support\ProjectCatalog;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Database\Seeders\DemoUsers;
 
 /**
  * Scale/workflow-fidelity check: drives N projects through the real
@@ -33,12 +34,17 @@ class GenerateDemoProjects extends Command
 
     public function handle(): int
     {
+        if (! app()->environment(['local', 'testing'])) {
+            $this->error('Demo generation is restricted to local or testing environments.');
+
+            return self::FAILURE;
+        }
         $count = max(1, (int) $this->argument('count'));
 
-        $reviewer = User::where('email', 'reviewer@gmail.com')->first();
-        $planner = User::where('email', 'planner@gmail.com')->first();
-        $coordinator = User::where('email', 'coordinator@gmail.com')->first();
-        $approver = User::where('email', 'approver@gmail.com')->first();
+        $reviewer = DemoUsers::resolve('Project Reviewer', 'reviewer@example.test');
+        $planner = DemoUsers::resolve('Project Planner', 'planner@example.test');
+        $coordinator = DemoUsers::resolve('Project Coordinator', 'coordinator@example.test');
+        $approver = DemoUsers::resolve('Project Approver', 'approver@example.test');
 
         if (! $reviewer || ! $planner || ! $coordinator || ! $approver) {
             $this->error('Expected reviewer@gmail.com, planner@gmail.com, coordinator@gmail.com and approver@gmail.com to already exist.');

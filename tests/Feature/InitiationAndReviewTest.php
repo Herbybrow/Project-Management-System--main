@@ -226,6 +226,9 @@ class InitiationAndReviewTest extends TestCase
             ->assertJsonPath('data.helpers.hasPassedAllUAT', true)
             ->assertJsonPath('data.helpers.hasAllClosureDocsReviewed', true);
 
+        // The current workflow requires the planner's closure request.
+        $project->update(['closure_requested_at' => now(), 'closure_requested_by' => $owner->id]);
+
         $this->postJson("/api/projects/{$project->id}/close", [
             'comment' => 'Reviewer sign-off',
         ])->assertOk()

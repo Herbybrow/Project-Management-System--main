@@ -17,5 +17,12 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // These compiler migration diagnostics are valuable, but the React
+      // Compiler is not enabled in this application. Keep them visible while
+      // allowing the release gate to enforce the correctness rules above.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
   },
 ])

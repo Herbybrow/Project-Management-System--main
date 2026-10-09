@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Permission;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class PermissionSeeder extends Seeder
 {
@@ -30,22 +29,6 @@ class PermissionSeeder extends Seeder
 
         foreach ($permissions as $perm) {
             Permission::updateOrCreate(['code' => $perm['code']], $perm);
-        }
-
-        // Retire permissions that belonged to the removed Implementor role / old plan flow.
-        $obsoleteCodes = [
-            'projects.implement',
-            'projects.assign_implementor',
-            'projects.plan_update',
-        ];
-
-        $obsolete = Permission::whereIn('code', $obsoleteCodes)->get();
-        foreach ($obsolete as $permission) {
-            $permission->roles()->detach();
-            DB::table('user_permissions')
-                ->where('permission_id', $permission->id)
-                ->delete();
-            $permission->delete();
         }
     }
 }

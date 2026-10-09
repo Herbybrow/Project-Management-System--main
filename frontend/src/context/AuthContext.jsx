@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../lib/axios'
+import { requestCache } from '../lib/requestCache'
 import { getAssignedRoles } from '../layouts/nav'
 
 const AuthContext = createContext(null)
@@ -36,7 +37,11 @@ function resolveActiveRole(user) {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem('user_data')
-    return raw ? JSON.parse(raw) : null
+    try {
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
   })
   const [token, setToken] = useState(() => localStorage.getItem('auth_token') || null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(() => Boolean(localStorage.getItem('auth_token')))
@@ -66,7 +71,8 @@ export const AuthProvider = ({ children }) => {
         setUser(meUser)
         setToken(localStorage.getItem('auth_token'))
         localStorage.setItem('user_data', JSON.stringify(meUser))
-      } catch (e) {
+      } catch {
+        requestCache.invalidate()
         persistActiveRole(null)
         localStorage.clear()
         setActiveRole(null)
@@ -85,6 +91,7 @@ export const AuthProvider = ({ children }) => {
   }, [user])
 
   const login = (userData, authToken) => {
+    requestCache.invalidate()
     setUser(userData)
     setToken(authToken)
     localStorage.setItem('user_data', JSON.stringify(userData))
@@ -103,6 +110,7 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // Even if server logout fails, clear the client session.
     } finally {
+      requestCache.invalidate()
       persistActiveRole(null)
       setActiveRole(null)
       setUser(null)

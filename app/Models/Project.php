@@ -72,6 +72,7 @@ class Project extends Model
         'closed_at' => 'datetime',
         'closure_requested_at' => 'datetime',
         'budget' => 'float',
+        'overall_implementation_score' => 'float',
         'planned_start_date' => 'date',
         'planned_end_date' => 'date',
         'actual_start_date' => 'date',
@@ -304,23 +305,15 @@ class Project extends Model
     {
         // Initiation package is accepted at registration; closure gates apply to
         // planning/execution deliverables only.
-        $documents = $this->documents
-            ->where('is_current', true)
-            ->filter(fn (Document $document) => strtolower((string) $document->phase) !== 'initiation');
+        $documents = $this->documents()->where('is_current', true)
+            ->whereRaw("LOWER(COALESCE(phase, '')) <> ?", ['initiation']);
 
-        if ($documents->isEmpty()) {
-            return false;
-        }
-
-        return $documents->every(function (Document $document) {
-            return strtolower((string) $document->review_status) === 'approved';
-        });
+        return (clone $documents)->exists()
+            && ! (clone $documents)->whereRaw("LOWER(COALESCE(review_status, '')) <> ?", ['approved'])->exists();
     }
 
     public function closureChecks(): array
     {
-        $this->loadMissing(['implementationActivities', 'requirements', 'documents']);
-
         return [
             [
                 'key' => 'plan_approved',

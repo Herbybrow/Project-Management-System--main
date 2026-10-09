@@ -57,13 +57,15 @@ class DocumentController extends Controller
     {
         $validated = $request->validate([
             'project_id' => ['required', 'exists:projects,id'],
-            'activity_id' => ['nullable', 'exists:implementation_activities,id'],
-            'requirement_id' => ['nullable', 'exists:requirements,id'],
+            'activity_id' => ['nullable', Rule::exists('implementation_activities', 'id')->where('project_id', $request->input('project_id'))],
+            'requirement_id' => ['nullable', Rule::exists('requirements', 'id')->where('project_id', $request->input('project_id'))],
             'document_type' => ['nullable', 'string', 'max:100'],
             'file' => ['required', 'file', 'mimes:pdf,docx,xlsx', 'max:10240'],
         ]);
 
-        ProjectWorkflowService::assertProjectOpen(Project::findOrFail($validated['project_id']));
+        $project = Project::findOrFail($validated['project_id']);
+        ProjectWorkflowService::assertProjectOpen($project);
+        $this->authorizeWrite($request, $project);
 
         $file = $request->file('file');
         // 'local' (storage/app/private) is not web-reachable — every file is
@@ -214,6 +216,7 @@ class DocumentController extends Controller
     public function replace(Request $request, Document $document): JsonResponse
     {
         ProjectWorkflowService::assertProjectOpen($document->project);
+        $this->authorizeWrite($request, $document->project);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'mimes:pdf,docx,xlsx', 'max:10240'],
@@ -247,9 +250,10 @@ class DocumentController extends Controller
         ], 201);
     }
 
-    public function destroy(Document $document): JsonResponse
+    public function destroy(Request $request, Document $document): JsonResponse
     {
         ProjectWorkflowService::assertProjectOpen($document->project);
+        $this->authorizeWrite($request, $document->project);
 
         if ($document->file_url) {
             Storage::disk('local')->delete($document->file_url);
@@ -273,5 +277,15 @@ class DocumentController extends Controller
         }
 
         return 'Document';
+    }
+
+    private function authorizeWrite(Request $request, Project $project): void
+    {
+        $user = $request->user();
+        // Match existing editable document roles; planners are scoped to
+        // their assigned projects, as they are for implementation activities.
+        abort_unless($project->canBeManagedBy($user)
+            || $user->hasRole('Project Reviewer')
+            || $user->hasRole('ICT Support'), 403);
     }
 }

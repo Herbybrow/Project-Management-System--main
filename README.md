@@ -1,3 +1,13 @@
+## NSSF Project Management System
+
+Laravel is the API backend at this repository root. The working React/Vite SPA is in `frontend/` and builds to `frontend/dist`. PostgreSQL is the primary database; keep your existing `.env` and configure it manually from `.env.example`.
+
+Start with [the architecture audit](docs/ARCHITECTURE.md), [executed checks and limitations](docs/AUDIT_RESULTS.md), and [the manual Site 2 deployment guide](docs/DEPLOYMENT_GUIDE.md). Database details are in [PostgreSQL migration](docs/POSTGRESQL_MIGRATION.md); resource proposals are in [performance optimization](docs/PERFORMANCE_OPTIMIZATION.md).
+
+Use `composer install` at the root and `npm ci` inside `frontend`. Do not use the unrelated root Vite build or the generic Composer setup script for this application. Run `php vendor/phpunit/phpunit/phpunit` for isolated SQLite tests. The PostgreSQL test cluster procedure is documented separately and does not reset your normal database.
+
+Default `db:seed` creates reference roles/permissions only. `DemoSeeder` is explicit local/testing data. Production account initialization uses `php artisan users:bootstrap-admin`, followed by User Management. No remote deployment, commit or push is performed by repository setup documentation.
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

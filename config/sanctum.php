@@ -37,7 +37,8 @@ return [
     |
     */
 
-    'guard' => ['web'],
+    // This standalone frontend uses bearer tokens, not a session-cookie SPA.
+    'guard' => [],
 
     /*
     |--------------------------------------------------------------------------

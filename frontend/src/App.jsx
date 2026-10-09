@@ -1,11 +1,9 @@
-import React, { lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Spin } from 'antd'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 import Login from './pages/login'
-import DashboardPage from './pages/DashboardPage'
-import ProjectsPage from './pages/ProjectsPage'
 import AppLayout from './layouts/AppLayout'
 import { pathAllowedForRole } from './layouts/nav'
 
@@ -173,3 +171,5 @@ export default function App() {
     </AuthProvider>
   )
 }
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'))

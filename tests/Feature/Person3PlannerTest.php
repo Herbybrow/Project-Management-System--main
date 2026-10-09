@@ -141,8 +141,8 @@ class Person3PlannerTest extends TestCase
     #[Test]
     public function matrix_scores_are_zero_fifty_or_one_hundred_from_progress_endpoint(): void
     {
-        $this->actingPlanner();
-        $project = Project::create(['name' => 'SRS']);
+        $planner = $this->actingPlanner();
+        $project = Project::create(['name' => 'SRS', 'planner_id' => $planner->id]);
         Requirement::create([
             'project_id' => $project->id,
             'requirement_code' => 'REQ-1',

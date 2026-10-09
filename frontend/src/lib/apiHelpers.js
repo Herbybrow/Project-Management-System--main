@@ -1,3 +1,5 @@
+import { apiBaseUrl } from './apiConfig'
+
 const SELECTED_PROJECT_KEY = 'selected_project_id'
 
 export function unwrapList(payload) {
@@ -58,7 +60,6 @@ export function datesToImplementationStatus({ actual_start_date, actual_end_date
 }
 
 export function documentFileUrl(documentId) {
-  const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
   return `${apiBaseUrl.replace(/\/$/, '')}/documents/${documentId}/file`
 }
 

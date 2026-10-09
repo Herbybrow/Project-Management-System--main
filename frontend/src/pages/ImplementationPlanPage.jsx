@@ -23,6 +23,8 @@ import { isSpecReadOnlyRole, useActiveRoleName } from '../components/common/Role
 import { ROLES } from '../utility/Config.jsx'
 import api from '../lib/axios'
 import { fetchProjectsCached } from '../lib/projectsCache'
+import { fetchCached } from '../lib/cachedApi'
+import { useRequestCacheRevision } from '../lib/useRequestCacheRevision'
 import { submitPlanForReview } from '../api/planner'
 import {
   getMissingRequiredDocumentTypes,
@@ -63,6 +65,7 @@ function ImplementationPlanPage({
   registerActions = null,
   readOnlyBrowse = false,
   workspaceSection = null,
+  active = true,
 } = {}) {
   const { id: routeId } = useParams()
   const [searchParams] = useSearchParams()
@@ -71,6 +74,7 @@ function ImplementationPlanPage({
   const [projects, setProjects] = useState([])
   const [users, setUsers] = useState([])
   const [projectId, setProjectId] = useState(() => {
+    if (projectIdProp) return projectIdProp
     const fromRoute = Number(routeId)
     if (Number.isFinite(fromRoute) && fromRoute > 0) {
       storeProjectId(fromRoute)
@@ -120,6 +124,7 @@ function ImplementationPlanPage({
   const [rtmEditCode, setRtmEditCode] = useState('')
   const [rtmEditDescription, setRtmEditDescription] = useState('')
   const [rtmEditSaving, setRtmEditSaving] = useState(false)
+  const revision = useRequestCacheRevision()
 
   const people = users.map((user) => ({
     id: user.id,
@@ -136,7 +141,7 @@ function ImplementationPlanPage({
     // GET /projects/{id} returns the project (needed for its planned_start/
     // end_date, to bound activity/requirement date pickers) and the workflow
     // payload together, so one request covers what used to be two calls.
-    const response = await api.get(`/projects/${id}`)
+    const response = await fetchCached(`/projects/${id}`, { params: { summary: 1 } })
     setProjectMeta(response.data?.data ?? null)
     setWorkflow(response.data?.workflow ?? null)
   }, [])
@@ -180,18 +185,12 @@ function ImplementationPlanPage({
           storeProjectId(embeddedId)
           setProjectId(embeddedId)
         }
-        const usersRes = await api.get('/users')
-        setUsers(unwrapList(usersRes.data))
         return
       }
 
-      const [projectsRes, usersRes] = await Promise.all([
-        fetchProjectsCached(),
-        api.get('/users'),
-      ])
+      const projectsRes = await fetchProjectsCached()
       const projectList = unwrapList(projectsRes.data)
       setProjects(projectList)
-      setUsers(unwrapList(usersRes.data))
       const fromRoute = Number(routeId)
       if (Number.isFinite(fromRoute) && fromRoute > 0) {
         storeProjectId(fromRoute)
@@ -217,7 +216,7 @@ function ImplementationPlanPage({
     setLoading(true)
     setError('')
     try {
-      const response = await api.get(`/projects/${id}/activities`)
+      const response = await fetchCached(`/projects/${id}/activities`)
       setActivities(unwrapList(response.data))
       await loadWorkflow(id)
     } catch (err) {
@@ -235,26 +234,36 @@ function ImplementationPlanPage({
     }
     setRequirementsLoading(true)
     try {
-      const response = await api.get(`/projects/${id}/requirements`)
+      const response = await fetchCached(`/projects/${id}/requirements`)
       setRequirements(unwrapList(response.data))
+      await loadWorkflow(id)
     } catch {
       setRequirements([])
     } finally {
       setRequirementsLoading(false)
     }
-  }, [])
+  }, [loadWorkflow])
 
   useEffect(() => {
-    loadProjectsAndUsers()
-  }, [loadProjectsAndUsers])
+    if (active) loadProjectsAndUsers()
+  }, [active, loadProjectsAndUsers])
 
   useEffect(() => {
-    if (simplifiedPlannerView) loadRequirements(projectId)
-  }, [projectId, simplifiedPlannerView, loadRequirements])
+    if (active && simplifiedPlannerView && workspaceSection !== 'activities') loadRequirements(projectId)
+  }, [active, projectId, simplifiedPlannerView, workspaceSection, loadRequirements, revision])
 
   useEffect(() => {
-    loadActivities(projectId)
-  }, [projectId, loadActivities])
+    if (active && workspaceSection !== 'requirements') loadActivities(projectId)
+  }, [active, projectId, workspaceSection, loadActivities, revision])
+
+  useEffect(() => {
+    if (!active || (!formTarget && !reviewTarget && !detailsTarget)) return
+    let cancelled = false
+    fetchCached('/users').then((response) => {
+      if (!cancelled) setUsers(unwrapList(response.data))
+    }).catch(() => message.error('Could not load team members.'))
+    return () => { cancelled = true }
+  }, [active, formTarget, reviewTarget, detailsTarget])
 
   useEffect(() => {
     if (!projectIdProp) return
@@ -386,20 +395,6 @@ function ImplementationPlanPage({
       setFormTarget(null)
       message.error(err.response?.data?.message || 'Activity saved, but a follow-up step failed.')
     }
-  }
-
-  const handleDelete = (id) => {
-    Modal.confirm({
-      title: 'Delete this activity?',
-      content: 'This cannot be undone.',
-      okText: 'Delete',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        await api.delete(`/activities/${id}`)
-        setActivities((prev) => prev.filter((activity) => activity.id !== id))
-        message.success('Activity deleted')
-      },
-    })
   }
 
   const loadReviewHistory = async (activityId) => {
@@ -677,7 +672,7 @@ function ImplementationPlanPage({
   const canUpdateRtmProgress = executionUnderway && canAddActivity
 
   useEffect(() => {
-    if (!registerActions) return undefined
+    if (!registerActions || !active) return undefined
     registerActions({
       openAddActivity: () => setFormTarget(BLANK_ACTIVITY),
       openAddRequirement: () => setRtmModalOpen(true),
@@ -685,7 +680,7 @@ function ImplementationPlanPage({
       canAddRequirement: Boolean(canAddRtm),
     })
     return () => registerActions(null)
-  }, [registerActions, canAddActivity, canAddRtm, projectId, planStatus])
+  }, [active, registerActions, canAddActivity, canAddRtm, projectId, planStatus])
 
   const openRtmView = (requirement) => {
     setRtmViewTarget(requirement)

@@ -39,6 +39,19 @@ class AuditLogTest extends TestCase
     }
 
     #[Test]
+    public function flagged_failures_include_earlier_attempts_outside_the_current_page(): void
+    {
+        $ict = $this->createIctSupportUser();
+        $target = User::factory()->create();
+        foreach ([10, 5, 1] as $minutesAgo) {
+            AuditLog::create(['user_id' => $target->id, 'action' => 'login_failed', 'created_at' => now()->subMinutes($minutesAgo)]);
+        }
+        Sanctum::actingAs($ict);
+        $this->getJson('/api/admin/audit-logs?action=login_failed&per_page=1')
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.flagged', true);
+    }
+
+    #[Test]
     public function successful_login_is_recorded(): void
     {
         $user = User::factory()->create(['email' => 'planner@nssf.or.tz']);

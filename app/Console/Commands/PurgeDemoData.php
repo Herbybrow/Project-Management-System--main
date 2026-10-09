@@ -34,7 +34,12 @@ class PurgeDemoData extends Command
 
     public function handle(): int
     {
-        if (! $this->option('force') && ! $this->confirm('Delete all NSSF-DEMO projects and disposable demo role users?', true)) {
+        if (! app()->environment(['local', 'testing'])) {
+            $this->error('Demo data deletion is restricted to local or testing environments.');
+
+            return self::FAILURE;
+        }
+        if (! $this->option('force') && ! $this->confirm('Delete demo projects and disposable demo role users?', false)) {
             $this->info('Cancelled.');
 
             return self::SUCCESS;
@@ -48,7 +53,7 @@ class PurgeDemoData extends Command
 
         // Also clear leftover manual test projects that never got a demo prefix
         // (e.g. Registration System, NEcta) so queues/dashboards start empty.
-        if ($this->option('all-projects') || $this->option('force')) {
+        if ($this->option('all-projects')) {
             $demoProjectQuery = Project::query();
         }
         $projectCount = (clone $demoProjectQuery)->count();
